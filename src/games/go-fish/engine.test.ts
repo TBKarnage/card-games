@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   askForRank,
   chooseBotMove,
+  confirmHumanHandoff,
   createGoFishGame,
   extractBooks,
   getGoFishWinners,
@@ -95,5 +96,26 @@ describe('Go Fish engine', () => {
     const winners = getGoFishWinners(state)
     expect(winners).toHaveLength(1)
     expect(winners[0].id).toBe('human')
+  })
+
+  it('supports 2-human Pass & Play with handoff between turns', () => {
+    const state = createGoFishGame(2, 'gentle', () => 0.5, 2)
+    expect(state.players.every((p) => p.isHuman)).toBe(true)
+    expect(state.players[0].name).toBe('Player 1')
+    expect(state.players[1].name).toBe('Player 2')
+
+    state.players[0].hand = [card('spades', 4)]
+    state.players[1].hand = [card('hearts', 9)]
+    state.pond = [card('clubs', 2, false)]
+
+    const goFishState = askForRank(state, state.players[1].id, 4).nextState
+    expect(goFishState.phase).toBe('human-go-fish')
+
+    const afterDraw = resolveGoFishDraw(goFishState).nextState
+    expect(afterDraw.currentPlayerIndex).toBe(1)
+    expect(afterDraw.phase).toBe('human-handoff')
+
+    const ready = confirmHumanHandoff(afterDraw)
+    expect(ready.phase).toBe('human-pick')
   })
 })

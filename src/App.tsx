@@ -8,6 +8,7 @@ import type { CardGameEntry } from './games/registry'
 import { GoFishBoard } from './games/go-fish/GoFishBoard'
 import { MemoryBoard } from './games/memory/MemoryBoard'
 import { SolitaireBoard } from './games/solitaire/SolitaireBoard'
+import { TrashBoard } from './games/trash/TrashBoard'
 import { soundFX } from './utils/audio'
 import {
   getDefaultProfile,
@@ -185,11 +186,27 @@ export function App() {
           onToggleSound={handleToggleSound}
           onRecordWin={handleRecordWin}
         />
+      ) : activeGame === 'trash' ? (
+        <TrashBoard
+          cardBackId={profile.settings.cardBackId}
+          largePrint={profile.settings.largePrint}
+          soundEnabled={profile.settings.soundEnabled}
+          onBackToHub={() => setActiveGame(null)}
+          onOpenCustomize={() => setCustomizeOpen(true)}
+          onOpenSettings={() => setSettingsOpen(true)}
+          onToggleSound={handleToggleSound}
+          onRecordWin={handleRecordWin}
+        />
       ) : (
         <HomeHub
           profile={profile}
           onLaunchGame={(id) => {
-            if (id === 'solitaire' || id === 'memory-match' || id === 'go-fish') {
+            if (
+              id === 'solitaire' ||
+              id === 'memory-match' ||
+              id === 'go-fish' ||
+              id === 'trash'
+            ) {
               setActiveGame(id)
             }
           }}

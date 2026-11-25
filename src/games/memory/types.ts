@@ -1,6 +1,6 @@
 export type MemoryGridSize = '3x4' | '4x4' | '4x5'
 
-export type MemoryPlayerMode = 1 | 2
+export type MemoryPlayerMode = 1 | 2 | 'bot'
 
 export type MemorySymbolId =
   | 'teacup'

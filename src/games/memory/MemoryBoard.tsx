@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   ArrowLeft,
+  Bot,
   Check,
   Grid2x2,
   Palette,
@@ -24,10 +25,16 @@ import {
   getPairCount,
   isMemoryWon,
   MEMORY_GRID_OPTIONS,
+  pickBotMemoryCard,
   resolveMismatch,
 } from './engine'
 import { MemoryIllustration } from './MemoryIllustration'
-import type { MemoryGameState, MemoryGridSize, MemoryPlayerMode } from './types'
+import type {
+  MemoryGameState,
+  MemoryGridSize,
+  MemoryPlayerMode,
+  MemorySymbolId,
+} from './types'
 
 interface MemoryBoardProps {
   cardBackId: CardBackId
@@ -69,6 +76,7 @@ export function MemoryBoard({
   const [newlyUnlocked, setNewlyUnlocked] = useState<string[]>([])
 
   const winRecordedRef = useRef(false)
+  const botMemoryRef = useRef<Record<string, MemorySymbolId>>({})
   const won = useMemo(() => isMemoryWon(game), [game])
   const totalPairs = getPairCount(gridSize)
   const matchedPairs = game.scores[0] + game.scores[1]
@@ -102,10 +110,58 @@ export function MemoryBoard({
     return () => window.clearTimeout(id)
   }, [game.isResolvingMismatch])
 
+  const executeFlip = useCallback((cardId: string) => {
+    setGame((prev) => {
+      const target = prev.cards.find((c) => c.id === cardId)
+      if (target) {
+        botMemoryRef.current[target.id] = target.symbolId
+      }
+      const result = flipMemoryCard(prev, cardId)
+      if (result.outcome === 'ignored') return prev
+
+      if (result.outcome === 'first-flip') {
+        soundFX.playCardFlip()
+      } else if (result.outcome === 'match') {
+        soundFX.playCardSnap()
+      } else if (result.outcome === 'mismatch') {
+        soundFX.playCardError()
+      }
+      return result.nextState
+    })
+  }, [])
+
+  // Barnaby Bot turn automation when playing vs Robot
+  useEffect(() => {
+    if (
+      playerMode !== 'bot' ||
+      game.currentPlayer !== 2 ||
+      won ||
+      isSetupOpen ||
+      game.isResolvingMismatch
+    ) {
+      return
+    }
+
+    const id = window.setTimeout(() => {
+      const pick = pickBotMemoryCard(game, botMemoryRef.current)
+      if (pick) {
+        executeFlip(pick)
+      }
+    }, 650)
+    return () => window.clearTimeout(id)
+  }, [
+    playerMode,
+    game,
+    won,
+    isSetupOpen,
+    executeFlip,
+  ])
+
   const startNewDeal = useCallback(
     (nextGrid: MemoryGridSize = gridSize, nextPlayers: MemoryPlayerMode = playerMode) => {
       soundFX.playCardFlip()
       winRecordedRef.current = false
+      botMemoryRef.current = {}
       setNewlyUnlocked([])
       setElapsedSeconds(0)
       setGridSize(nextGrid)
@@ -126,17 +182,8 @@ export function MemoryBoard({
 
   const handleCardTap = (cardId: string) => {
     if (won || isSetupOpen || game.isResolvingMismatch) return
-    const result = flipMemoryCard(game, cardId)
-    if (result.outcome === 'ignored') return
-
-    setGame(result.nextState)
-    if (result.outcome === 'first-flip') {
-      soundFX.playCardFlip()
-    } else if (result.outcome === 'match') {
-      soundFX.playCardSnap()
-    } else if (result.outcome === 'mismatch') {
-      soundFX.playCardError()
-    }
+    if (playerMode === 'bot' && game.currentPlayer === 2) return
+    executeFlip(cardId)
   }
 
   const gridLabel =
@@ -144,6 +191,11 @@ export function MemoryBoard({
 
   const winHeadline = useMemo(() => {
     if (playerMode === 1) return 'Every Pair Found!'
+    if (playerMode === 'bot') {
+      if (game.scores[0] > game.scores[1]) return 'You Beat Barnaby Bot!'
+      if (game.scores[1] > game.scores[0]) return 'Barnaby Bot Won!'
+      return "It's a Cozy Tie!"
+    }
     if (game.scores[0] > game.scores[1]) return 'Player 1 Wins!'
     if (game.scores[1] > game.scores[0]) return 'Player 2 Wins!'
     return "It's a Cozy Tie!"
@@ -184,20 +236,20 @@ export function MemoryBoard({
           >
             <SlidersHorizontal size={14} />
             <span>
-              {gridLabel} • {playerMode}P
+              {gridLabel} • {playerMode === 'bot' ? 'vs Bot' : `${playerMode}P`}
             </span>
           </button>
         </div>
 
         <div className="hud-center">
-          {playerMode === 2 ? (
+          {playerMode === 2 || playerMode === 'bot' ? (
             <div className="memory-players-hud">
               <div
                 className={`player-turn-pill ${
                   game.currentPlayer === 1 ? 'is-active' : ''
                 }`}
               >
-                <span>P1</span>
+                <span>{playerMode === 'bot' ? 'You' : 'P1'}</span>
                 <strong>{game.scores[0]}</strong>
               </div>
               <div
@@ -205,7 +257,7 @@ export function MemoryBoard({
                   game.currentPlayer === 2 ? 'is-active' : ''
                 }`}
               >
-                <span>P2</span>
+                <span>{playerMode === 'bot' ? 'Bot' : 'P2'}</span>
                 <strong>{game.scores[1]}</strong>
               </div>
             </div>
@@ -267,9 +319,13 @@ export function MemoryBoard({
       </header>
 
       <main className="memory-board">
-        {playerMode === 2 && !won && (
+        {(playerMode === 2 || playerMode === 'bot') && !won && (
           <div className="memory-turn-banner" role="status">
-            Player {game.currentPlayer}&apos;s turn — find a matching pair!
+            {playerMode === 'bot'
+              ? game.currentPlayer === 1
+                ? 'Your turn — find a matching pair!'
+                : 'Barnaby Bot is thinking...'
+              : `Player ${game.currentPlayer}'s turn — find a matching pair!`}
           </div>
         )}
 
@@ -349,10 +405,10 @@ export function MemoryBoard({
             <div className="modal-body">
               <section className="customize-section">
                 <h3>Players</h3>
-                <div className="memory-setup-grid memory-setup-grid--2">
+                <div className="memory-setup-grid memory-setup-grid--3">
                   <button
                     type="button"
-                    className={`memory-setup-option ${
+                    className={`memory-setup-option memory-setup-option--stack ${
                       draftPlayerMode === 1 ? 'is-selected' : ''
                     }`}
                     onClick={() => {
@@ -371,7 +427,7 @@ export function MemoryBoard({
 
                   <button
                     type="button"
-                    className={`memory-setup-option ${
+                    className={`memory-setup-option memory-setup-option--stack ${
                       draftPlayerMode === 2 ? 'is-selected' : ''
                     }`}
                     onClick={() => {
@@ -384,7 +440,26 @@ export function MemoryBoard({
                     </div>
                     <div className="memory-setup-text">
                       <strong>2 Players</strong>
-                      <span>Take turns on one screen</span>
+                      <span>2 Humans (Pass &amp; Play)</span>
+                    </div>
+                  </button>
+
+                  <button
+                    type="button"
+                    className={`memory-setup-option memory-setup-option--stack ${
+                      draftPlayerMode === 'bot' ? 'is-selected' : ''
+                    }`}
+                    onClick={() => {
+                      soundFX.playButtonTap()
+                      setDraftPlayerMode('bot')
+                    }}
+                  >
+                    <div className="memory-setup-icon">
+                      <Bot size={22} />
+                    </div>
+                    <div className="memory-setup-text">
+                      <strong>vs Robot</strong>
+                      <span>Play against Barnaby Bot</span>
                     </div>
                   </button>
                 </div>
@@ -458,7 +533,9 @@ export function MemoryBoard({
             <p className="modal-subtitle">
               {playerMode === 2
                 ? `Final score: Player 1 (${game.scores[0]}) — Player 2 (${game.scores[1]})`
-                : 'Sharp eyes — every cozy pair is matched!'}
+                : playerMode === 'bot'
+                  ? `Final score: You (${game.scores[0]}) — Barnaby Bot (${game.scores[1]})`
+                  : 'Sharp eyes — every cozy pair is matched!'}
             </p>
             <div className="win-stats-grid">
               <div>

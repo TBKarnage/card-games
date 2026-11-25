@@ -1,5 +1,5 @@
 export interface CardGameEntry {
-  id: 'solitaire' | 'memory-match' | 'go-fish'
+  id: 'solitaire' | 'memory-match' | 'go-fish' | 'trash'
   title: string
   subtitle: string
   playersLabel: string
@@ -38,6 +38,16 @@ export const CARD_GAMES_REGISTRY: CardGameEntry[] = [
     ageLabel: 'Ages 6+',
     badge: 'Play Now',
     accent: '#c47b2b',
+    available: true,
+  },
+  {
+    id: 'trash',
+    title: 'Trash / Garbage',
+    subtitle: 'Race to flip slots 1–10 face-up! Jacks are wild; Queens & Kings are trash.',
+    playersLabel: '2–4 Players',
+    ageLabel: 'Ages 6+',
+    badge: 'Play Now',
+    accent: '#7a4b94',
     available: true,
   },
 ]

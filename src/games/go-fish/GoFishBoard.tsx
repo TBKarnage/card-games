@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   ArrowLeft,
+  Bot,
   Fish,
   Palette,
   Play,
@@ -22,11 +23,11 @@ import { soundFX } from '../../utils/audio'
 import {
   askForRank,
   chooseBotMove,
+  confirmHumanHandoff,
   createGoFishGame,
   getGoFishWinners,
   getRankPlural,
   GO_FISH_DIFFICULTY_OPTIONS,
-  GO_FISH_PLAYER_OPTIONS,
   resolveGoFishDraw,
 } from './engine'
 import type { GoFishDifficulty, GoFishPlayer, GoFishPlayerCount, GoFishState } from './types'
@@ -72,20 +73,29 @@ export function GoFishBoard({
   onRecordWin,
 }: GoFishBoardProps) {
   const [playerCount, setPlayerCount] = useState<GoFishPlayerCount>(3)
+  const [humanCount, setHumanCount] = useState<1 | 2>(1)
   const [difficulty, setDifficulty] = useState<GoFishDifficulty>('gentle')
   const [draftPlayerCount, setDraftPlayerCount] = useState<GoFishPlayerCount>(3)
+  const [draftHumanCount, setDraftHumanCount] = useState<1 | 2>(1)
   const [draftDifficulty, setDraftDifficulty] = useState<GoFishDifficulty>('gentle')
   const [isSetupOpen, setIsSetupOpen] = useState(true)
   const [hasStarted, setHasStarted] = useState(false)
 
-  const [game, setGame] = useState<GoFishState>(() => createGoFishGame(3, 'gentle'))
+  const [game, setGame] = useState<GoFishState>(() => createGoFishGame(3, 'gentle', Math.random, 1))
   const [selectedRank, setSelectedRank] = useState<Rank | null>(null)
   const [elapsedSeconds, setElapsedSeconds] = useState(0)
   const [newlyUnlocked, setNewlyUnlocked] = useState<string[]>([])
 
   const winRecordedRef = useRef(false)
-  const humanPlayer = game.players[0]
-  const opponents = game.players.slice(1)
+  const activeHuman = useMemo(() => {
+    const curr = game.players[game.currentPlayerIndex]
+    if (curr?.isHuman) return curr
+    return game.players.find((p) => p.isHuman) ?? game.players[0]
+  }, [game.players, game.currentPlayerIndex])
+  const opponents = useMemo(
+    () => game.players.filter((p) => p.id !== activeHuman.id),
+    [game.players, activeHuman.id]
+  )
   const totalBooks = game.players.reduce((sum, p) => sum + p.books.length, 0)
   const gameOver = game.phase === 'game-over'
 
@@ -138,7 +148,8 @@ export function GoFishBoard({
   const startNewDeal = useCallback(
     (
       nextCount: GoFishPlayerCount = playerCount,
-      nextDiff: GoFishDifficulty = difficulty
+      nextDiff: GoFishDifficulty = difficulty,
+      nextHumans: 1 | 2 = humanCount
     ) => {
       soundFX.playCardFlip()
       winRecordedRef.current = false
@@ -146,17 +157,19 @@ export function GoFishBoard({
       setSelectedRank(null)
       setElapsedSeconds(0)
       setPlayerCount(nextCount)
+      setHumanCount(nextHumans)
       setDifficulty(nextDiff)
-      setGame(createGoFishGame(nextCount, nextDiff))
+      setGame(createGoFishGame(nextCount, nextDiff, Math.random, nextHumans))
       setHasStarted(true)
       setIsSetupOpen(false)
     },
-    [playerCount, difficulty]
+    [playerCount, difficulty, humanCount]
   )
 
   const openSetupMenu = () => {
     soundFX.playButtonTap()
     setDraftPlayerCount(playerCount)
+    setDraftHumanCount(humanCount)
     setDraftDifficulty(difficulty)
     setIsSetupOpen(true)
   }
@@ -202,13 +215,17 @@ export function GoFishBoard({
   const winners = useMemo(() => (gameOver ? getGoFishWinners(game) : []), [gameOver, game])
   const resultHeading = useMemo(() => {
     if (!gameOver) return ''
+    if (humanCount === 2) {
+      if (winners.length === 1) return `${winners[0].name} Won the Pond!`
+      return "It's a Cozy Tie!"
+    }
     const humanWon = winners.some((w) => w.isHuman)
     if (humanWon && winners.length === 1) return 'You Won the Pond!'
     if (humanWon) return "It's a Cozy Tie!"
     return `${winners[0]?.name ?? 'A Tablebot'} Won!`
-  }, [gameOver, winners])
+  }, [gameOver, winners, humanCount])
 
-  const difficultyLabel = difficulty === 'gentle' ? 'Gentle' : 'Clever'
+  const difficultyLabel = humanCount === 2 ? 'Pass & Play' : difficulty === 'gentle' ? 'Gentle' : 'Clever'
 
   return (
     <div className="gofish-shell">
@@ -231,7 +248,7 @@ export function GoFishBoard({
           <button
             type="button"
             className="hud-btn"
-            onClick={() => startNewDeal(playerCount, difficulty)}
+            onClick={() => startNewDeal(playerCount, difficulty, humanCount)}
             title="New Deal"
           >
             <RotateCcw size={17} />
@@ -424,12 +441,16 @@ export function GoFishBoard({
         </section>
 
         {/* Human Player Hand & Books */}
-        <section className="gofish-player-zone" aria-label="Your hand and books">
+        <section className="gofish-player-zone" aria-label="Active player hand and books">
           <div className="gofish-player-bar">
             <div className="gofish-player-title">
-              <strong>Your Hand</strong>
+              <strong>
+                {humanCount === 2 ? `${activeHuman.name}'s Hand` : 'Your Hand'}
+              </strong>
               <span>
-                {game.phase === 'human-pick'
+                {game.phase === 'human-handoff'
+                  ? `Pass the screen to ${activeHuman.name}`
+                  : game.phase === 'human-pick'
                   ? selectedRank !== null
                     ? `Selected ${getRankLabel(selectedRank)} — tap a friend above!`
                     : 'Tap any card to pick a rank'
@@ -439,14 +460,14 @@ export function GoFishBoard({
               </span>
             </div>
 
-            <div className="gofish-books-strip" aria-label="Your completed books">
+            <div className="gofish-books-strip" aria-label="Completed books">
               <span className="gofish-books-label">
-                Your Books ({humanPlayer.books.length}):
+                {humanCount === 2 ? `${activeHuman.name}'s Books` : 'Your Books'} ({activeHuman.books.length}):
               </span>
-              {humanPlayer.books.length === 0 ? (
+              {activeHuman.books.length === 0 ? (
                 <span className="gofish-books-none">None yet</span>
               ) : (
-                humanPlayer.books.map((rank) => (
+                activeHuman.books.map((rank) => (
                   <span key={rank} className="gofish-book-badge">
                     {getRankLabel(rank)}
                   </span>
@@ -455,22 +476,41 @@ export function GoFishBoard({
             </div>
           </div>
 
-          <div className="gofish-hand-row">
-            {humanPlayer.hand.map((card) => {
-              const isSelected = selectedRank === card.rank
-              return (
-                <div key={card.id} className="gofish-hand-card-wrap">
-                  <PlayingCard
-                    card={card}
-                    cardBackId={cardBackId}
-                    largePrint={largePrint}
-                    selected={isSelected}
-                    onClick={() => handleSelectCard(card.rank)}
-                  />
-                </div>
-              )
-            })}
-          </div>
+          {game.phase === 'human-handoff' ? (
+            <div className="gofish-handoff-card">
+              <p>
+                No peeking! Hand the screen to <strong>{activeHuman.name}</strong>.
+              </p>
+              <button
+                type="button"
+                className="btn-primary"
+                onClick={() => {
+                  soundFX.playButtonTap()
+                  setSelectedRank(null)
+                  setGame((prev) => confirmHumanHandoff(prev))
+                }}
+              >
+                I&apos;m {activeHuman.name} — Show My Cards
+              </button>
+            </div>
+          ) : (
+            <div className="gofish-hand-row">
+              {activeHuman.hand.map((card) => {
+                const isSelected = selectedRank === card.rank
+                return (
+                  <div key={card.id} className="gofish-hand-card-wrap">
+                    <PlayingCard
+                      card={card}
+                      cardBackId={cardBackId}
+                      largePrint={largePrint}
+                      selected={isSelected}
+                      onClick={() => handleSelectCard(card.rank)}
+                    />
+                  </div>
+                )
+              })}
+            </div>
+          )}
         </section>
       </main>
 
@@ -487,7 +527,7 @@ export function GoFishBoard({
               <div>
                 <h2>Cozy Go Fish Setup</h2>
                 <p className="modal-subtitle">
-                  Choose how many friends are at the table and how clever the bots play.
+                  Play with a friend on one screen or against cozy tablebots!
                 </p>
               </div>
               <button
@@ -510,63 +550,123 @@ export function GoFishBoard({
             <div className="modal-body">
               <section className="customize-section">
                 <h3>Players at the Table</h3>
-                <div className="memory-setup-grid memory-setup-grid--3">
-                  {GO_FISH_PLAYER_OPTIONS.map((opt) => (
-                    <button
-                      key={opt.id}
-                      type="button"
-                      className={`memory-setup-option memory-setup-option--stack ${
-                        draftPlayerCount === opt.id ? 'is-selected' : ''
-                      }`}
-                      onClick={() => {
-                        soundFX.playButtonTap()
-                        setDraftPlayerCount(opt.id)
-                      }}
-                    >
-                      <div className="memory-setup-icon">
-                        <Users size={20} />
-                      </div>
-                      <div className="memory-setup-text">
-                        <strong>{opt.label}</strong>
-                        <span>{opt.hint}</span>
-                      </div>
-                    </button>
-                  ))}
+                <div className="memory-setup-grid memory-setup-grid--2">
+                  <button
+                    type="button"
+                    className={`memory-setup-option ${
+                      draftPlayerCount === 2 && draftHumanCount === 2 ? 'is-selected' : ''
+                    }`}
+                    onClick={() => {
+                      soundFX.playButtonTap()
+                      setDraftPlayerCount(2)
+                      setDraftHumanCount(2)
+                    }}
+                  >
+                    <div className="memory-setup-icon">
+                      <Users size={20} />
+                    </div>
+                    <div className="memory-setup-text">
+                      <strong>2 Players (2 Humans)</strong>
+                      <span>Pass &amp; play on one screen</span>
+                    </div>
+                  </button>
+
+                  <button
+                    type="button"
+                    className={`memory-setup-option ${
+                      draftPlayerCount === 2 && draftHumanCount === 1 ? 'is-selected' : ''
+                    }`}
+                    onClick={() => {
+                      soundFX.playButtonTap()
+                      setDraftPlayerCount(2)
+                      setDraftHumanCount(1)
+                    }}
+                  >
+                    <div className="memory-setup-icon">
+                      <Bot size={20} />
+                    </div>
+                    <div className="memory-setup-text">
+                      <strong>2 Players (vs Robot)</strong>
+                      <span>You vs. Barnaby Bear</span>
+                    </div>
+                  </button>
+
+                  <button
+                    type="button"
+                    className={`memory-setup-option ${
+                      draftPlayerCount === 3 && draftHumanCount === 1 ? 'is-selected' : ''
+                    }`}
+                    onClick={() => {
+                      soundFX.playButtonTap()
+                      setDraftPlayerCount(3)
+                      setDraftHumanCount(1)
+                    }}
+                  >
+                    <div className="memory-setup-icon">
+                      <Bot size={20} />
+                    </div>
+                    <div className="memory-setup-text">
+                      <strong>3 Players (vs Robots)</strong>
+                      <span>You + 2 tablebots</span>
+                    </div>
+                  </button>
+
+                  <button
+                    type="button"
+                    className={`memory-setup-option ${
+                      draftPlayerCount === 4 && draftHumanCount === 1 ? 'is-selected' : ''
+                    }`}
+                    onClick={() => {
+                      soundFX.playButtonTap()
+                      setDraftPlayerCount(4)
+                      setDraftHumanCount(1)
+                    }}
+                  >
+                    <div className="memory-setup-icon">
+                      <Bot size={20} />
+                    </div>
+                    <div className="memory-setup-text">
+                      <strong>4 Players (vs Robots)</strong>
+                      <span>Full cozy table</span>
+                    </div>
+                  </button>
                 </div>
               </section>
 
-              <section className="customize-section">
-                <h3>Tablebot Smarts</h3>
-                <div className="memory-setup-grid memory-setup-grid--2">
-                  {GO_FISH_DIFFICULTY_OPTIONS.map((opt) => (
-                    <button
-                      key={opt.id}
-                      type="button"
-                      className={`memory-setup-option ${
-                        draftDifficulty === opt.id ? 'is-selected' : ''
-                      }`}
-                      onClick={() => {
-                        soundFX.playButtonTap()
-                        setDraftDifficulty(opt.id)
-                      }}
-                    >
-                      <div className="memory-setup-icon">
-                        <Sparkles size={20} />
-                      </div>
-                      <div className="memory-setup-text">
-                        <strong>{opt.label}</strong>
-                        <span>{opt.hint}</span>
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              </section>
+              {draftHumanCount === 1 && (
+                <section className="customize-section">
+                  <h3>Tablebot Smarts</h3>
+                  <div className="memory-setup-grid memory-setup-grid--2">
+                    {GO_FISH_DIFFICULTY_OPTIONS.map((opt) => (
+                      <button
+                        key={opt.id}
+                        type="button"
+                        className={`memory-setup-option ${
+                          draftDifficulty === opt.id ? 'is-selected' : ''
+                        }`}
+                        onClick={() => {
+                          soundFX.playButtonTap()
+                          setDraftDifficulty(opt.id)
+                        }}
+                      >
+                        <div className="memory-setup-icon">
+                          <Sparkles size={20} />
+                        </div>
+                        <div className="memory-setup-text">
+                          <strong>{opt.label}</strong>
+                          <span>{opt.hint}</span>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </section>
+              )}
 
               <div className="memory-setup-actions">
                 <button
                   type="button"
                   className="btn-primary memory-setup-start"
-                  onClick={() => startNewDeal(draftPlayerCount, draftDifficulty)}
+                  onClick={() => startNewDeal(draftPlayerCount, draftDifficulty, draftHumanCount)}
                 >
                   <Play size={18} fill="currentColor" />
                   <span>Deal &amp; Play</span>
@@ -639,7 +739,7 @@ export function GoFishBoard({
               <button
                 type="button"
                 className="btn-primary"
-                onClick={() => startNewDeal(playerCount, difficulty)}
+                onClick={() => startNewDeal(playerCount, difficulty, humanCount)}
               >
                 Play Again
               </button>

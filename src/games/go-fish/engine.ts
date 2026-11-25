@@ -125,37 +125,89 @@ function findNextPlayerIndex(players: GoFishPlayer[], fromIndex: number): number
   return fromIndex
 }
 
+function nextPhaseForTurn(
+  players: GoFishPlayer[],
+  prevIdx: number,
+  nextIdx: number
+): GoFishState['phase'] {
+  if (!players[nextIdx].isHuman) return 'bot-turn'
+  const humanPlayers = players.filter((p) => p.isHuman).length
+  if (humanPlayers > 1 && nextIdx !== prevIdx) {
+    return 'human-handoff'
+  }
+  return 'human-pick'
+}
+
+export function confirmHumanHandoff(state: GoFishState): GoFishState {
+  if (state.phase !== 'human-handoff') return state
+  const current = state.players[state.currentPlayerIndex]
+  return {
+    ...state,
+    phase: 'human-pick',
+    statusMessage: `${current.name}'s turn! Pick a card in your hand, then tap a friend to ask.`,
+  }
+}
+
 export function createGoFishGame(
   playerCount: GoFishPlayerCount = 3,
   difficulty: GoFishDifficulty = 'gentle',
-  rng: () => number = Math.random
+  rng: () => number = Math.random,
+  humanCount: 1 | 2 = 1
 ): GoFishState {
   const deck = shuffleDeck(createDeck(), rng)
   const cardsPerPlayer = playerCount === 2 ? 7 : 5
 
-  const players: GoFishPlayer[] = [
-    {
-      id: 'human',
-      name: 'You',
-      avatar: 'you',
-      isHuman: true,
-      hand: [],
-      books: [],
-    },
-    ...BOT_ROSTER.slice(0, playerCount - 1).map((bot) => ({
-      id: bot.id,
-      name: bot.name,
-      avatar: bot.avatar,
-      isHuman: false,
-      hand: [],
-      books: [],
-    })),
-  ]
+  const players: GoFishPlayer[] =
+    humanCount === 2
+      ? [
+          {
+            id: 'human-1',
+            name: 'Player 1',
+            avatar: 'you',
+            isHuman: true,
+            hand: [],
+            books: [],
+          },
+          {
+            id: 'human-2',
+            name: 'Player 2',
+            avatar: 'bear',
+            isHuman: true,
+            hand: [],
+            books: [],
+          },
+          ...BOT_ROSTER.slice(0, Math.max(0, playerCount - 2)).map((bot) => ({
+            id: bot.id,
+            name: bot.name,
+            avatar: bot.avatar,
+            isHuman: false,
+            hand: [],
+            books: [],
+          })),
+        ]
+      : [
+          {
+            id: 'human',
+            name: 'You',
+            avatar: 'you',
+            isHuman: true,
+            hand: [],
+            books: [],
+          },
+          ...BOT_ROSTER.slice(0, playerCount - 1).map((bot) => ({
+            id: bot.id,
+            name: bot.name,
+            avatar: bot.avatar,
+            isHuman: false,
+            hand: [],
+            books: [],
+          })),
+        ]
 
   let cursor = 0
   for (let c = 0; c < cardsPerPlayer; c++) {
     for (let p = 0; p < playerCount; p++) {
-      const card = { ...deck[cursor++], faceUp: p === 0 }
+      const card = { ...deck[cursor++], faceUp: players[p].isHuman }
       players[p].hand.push(card)
     }
   }
@@ -175,10 +227,14 @@ export function createGoFishGame(
     currentPlayerIndex: 0,
     phase: 'human-pick',
     playerCount,
+    humanCount,
     difficulty,
     pendingRank: null,
     pendingTargetId: null,
-    statusMessage: 'Your turn! Pick a card in your hand, then tap a friend to ask.',
+    statusMessage:
+      humanCount === 2
+        ? "Player 1's turn! Pick a card in your hand, then tap Player 2 to ask."
+        : 'Your turn! Pick a card in your hand, then tap a friend to ask.',
     lastBubble: null,
     recentAsks: [],
     turns: 0,
@@ -296,7 +352,7 @@ export function askForRank(
       nextState: {
         ...draftState,
         currentPlayerIndex: nextIdx,
-        phase: nextPlayers[nextIdx].isHuman ? 'human-pick' : 'bot-turn',
+        phase: nextPhaseForTurn(nextPlayers, state.currentPlayerIndex, nextIdx),
       },
       gotCards: matching.length,
       newBooks,
@@ -411,6 +467,7 @@ export function resolveGoFishDraw(state: GoFishState): AskOutcome {
 
   const nextIdx = findNextPlayerIndex(nextPlayers, state.currentPlayerIndex)
   const nextPlayer = nextPlayers[nextIdx]
+  const nextPhase = nextPhaseForTurn(nextPlayers, state.currentPlayerIndex, nextIdx)
   const bookNote =
     newBooks.length > 0
       ? ` (${asker.name} made a Book of ${newBooks.map(getRankPlural).join(', ')}!)`
@@ -420,10 +477,13 @@ export function resolveGoFishDraw(state: GoFishState): AskOutcome {
     nextState: {
       ...draftBase,
       currentPlayerIndex: nextIdx,
-      phase: nextPlayer.isHuman ? 'human-pick' : 'bot-turn',
-      statusMessage: nextPlayer.isHuman
-        ? `${asker.name} went fishing${bookNote}. Your turn — pick a card & ask a friend!`
-        : `${asker.name} went fishing${bookNote}. ${nextPlayer.name}'s turn...`,
+      phase: nextPhase,
+      statusMessage:
+        nextPhase === 'human-handoff'
+          ? `${asker.name} went fishing${bookNote}. Pass to ${nextPlayer.name}!`
+          : nextPlayer.isHuman
+            ? `${asker.name} went fishing${bookNote}. Your turn — pick a card & ask a friend!`
+            : `${asker.name} went fishing${bookNote}. ${nextPlayer.name}'s turn...`,
     },
     gotCards: drawn ? 1 : 0,
     newBooks,

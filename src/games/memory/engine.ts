@@ -169,7 +169,11 @@ export function resolveMismatch(state: MemoryGameState): MemoryGameState {
     flippedSet.has(c.id) && !c.matched ? { ...c, faceUp: false } : c
   )
   const nextPlayer: 1 | 2 =
-    state.playerMode === 2 ? (state.currentPlayer === 1 ? 2 : 1) : 1
+    state.playerMode === 2 || state.playerMode === 'bot'
+      ? state.currentPlayer === 1
+        ? 2
+        : 1
+      : 1
 
   return {
     ...state,
@@ -178,6 +182,47 @@ export function resolveMismatch(state: MemoryGameState): MemoryGameState {
     currentPlayer: nextPlayer,
     isResolvingMismatch: false,
   }
+}
+
+export function pickBotMemoryCard(
+  state: MemoryGameState,
+  knownSymbols: Record<string, MemorySymbolId>,
+  rng: () => number = Math.random
+): string | null {
+  const available = state.cards.filter((c) => !c.faceUp && !c.matched)
+  if (available.length === 0) return null
+
+  // If bot has already flipped 1 card, check if it remembers where its match is
+  if (state.flippedIds.length === 1) {
+    const firstCard = state.cards.find((c) => c.id === state.flippedIds[0])
+    if (firstCard) {
+      const rememberedMatch = available.find(
+        (c) => c.id !== firstCard.id && knownSymbols[c.id] === firstCard.symbolId
+      )
+      if (rememberedMatch) return rememberedMatch.id
+    }
+  }
+
+  // On first flip, check if bot remembers any complete unmatched pair
+  if (state.flippedIds.length === 0) {
+    const seenBySymbol = new Map<MemorySymbolId, string[]>()
+    for (const card of available) {
+      const sym = knownSymbols[card.id]
+      if (!sym) continue
+      const list = seenBySymbol.get(sym) ?? []
+      list.push(card.id)
+      seenBySymbol.set(sym, list)
+      if (list.length >= 2) {
+        return list[0]
+      }
+    }
+  }
+
+  // Otherwise pick an unseen card if possible, or any available card
+  const unseen = available.filter((c) => !knownSymbols[c.id])
+  const pool = unseen.length > 0 ? unseen : available
+  const idx = Math.floor(rng() * pool.length)
+  return pool[idx]?.id ?? null
 }
 
 export function isMemoryWon(state: MemoryGameState): boolean {

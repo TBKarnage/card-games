@@ -3,6 +3,7 @@ import {
   createMemoryGame,
   flipMemoryCard,
   isMemoryWon,
+  pickBotMemoryCard,
   resolveMismatch,
 } from './engine'
 
@@ -78,5 +79,26 @@ describe('memory match engine', () => {
     expect(state.currentPlayer).toBe(2)
     expect(state.cards.find((c) => c.id === first.id)?.faceUp).toBe(false)
     expect(state.cards.find((c) => c.id === different.id)?.faceUp).toBe(false)
+  })
+
+  it('switches turns and uses bot memory in vs Robot mode', () => {
+    let state = createMemoryGame('3x4', 'bot', () => 0.42)
+    const first = state.cards[0]
+    const different = state.cards.find((c) => c.symbolId !== first.symbolId)!
+
+    state = flipMemoryCard(state, first.id).nextState
+    state = flipMemoryCard(state, different.id).nextState
+    state = resolveMismatch(state)
+    expect(state.currentPlayer).toBe(2)
+
+    const matchOfFirst = state.cards.find(
+      (c) => c.symbolId === first.symbolId && c.id !== first.id
+    )!
+    const known = {
+      [first.id]: first.symbolId,
+      [matchOfFirst.id]: matchOfFirst.symbolId,
+    }
+    const botPick = pickBotMemoryCard(state, known, () => 0)
+    expect([first.id, matchOfFirst.id]).toContain(botPick)
   })
 })

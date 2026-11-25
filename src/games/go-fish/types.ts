@@ -15,6 +15,7 @@ export interface GoFishPlayer {
 export type GoFishPhase =
   | 'human-pick'
   | 'human-go-fish'
+  | 'human-handoff'
   | 'bot-turn'
   | 'game-over'
 
@@ -29,6 +30,7 @@ export interface GoFishState {
   currentPlayerIndex: number
   phase: GoFishPhase
   playerCount: GoFishPlayerCount
+  humanCount: 1 | 2
   difficulty: GoFishDifficulty
   /** Rank the current player just asked for (used to check for a lucky Go Fish catch) */
   pendingRank: Rank | null

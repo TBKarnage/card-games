@@ -2180,3 +2180,252 @@ button {
 }
 
 
+
+/* === Trash / Garbage === */
+.trash-shell {
+  width: 100%;
+  max-width: var(--board-max-w);
+  height: 100dvh;
+  max-height: 100dvh;
+  margin: 0 auto;
+  padding: 8px 10px 10px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.trash-board {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: clamp(8px, 1.5vh, 14px);
+  padding-top: clamp(8px, 1.4vh, 12px);
+  overflow: hidden;
+}
+
+.trash-opponents {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.trash-bot-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 10px;
+  border-radius: 14px;
+  background: rgba(20, 12, 7, 0.36);
+  border: 2px solid rgba(255, 246, 233, 0.16);
+}
+
+.trash-bot-card.is-turn {
+  border-color: var(--warm-gold);
+  background: rgba(240, 192, 90, 0.14);
+}
+
+.trash-bot-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.trash-bot-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: rgba(255, 250, 241, 0.18);
+  font-size: 0.95rem;
+  flex-shrink: 0;
+}
+
+.trash-bot-meta {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.trash-bot-meta strong {
+  font-size: 0.82rem;
+  color: #fffaf2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.trash-bot-meta small {
+  font-size: 0.7rem;
+  color: rgba(255, 246, 233, 0.78);
+}
+
+.trash-bot-mini-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 4px;
+}
+
+.trash-mini-slot {
+  height: 20px;
+  border-radius: 5px;
+  display: grid;
+  place-items: center;
+  font-size: 0.65rem;
+  font-weight: 800;
+  background: rgba(255, 250, 241, 0.12);
+  color: rgba(255, 246, 233, 0.55);
+}
+
+.trash-mini-slot.is-open {
+  background: #f0c05a;
+  color: #2f1c0f;
+}
+
+.trash-center {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+
+.trash-piles-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(14px, 3vw, 28px);
+}
+
+.trash-pile-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+}
+
+.trash-pile-label {
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: rgba(255, 246, 233, 0.85);
+}
+
+.trash-pile-btn {
+  width: var(--card-w);
+  height: var(--card-h);
+  border-radius: var(--card-radius);
+  padding: 0;
+  transition: transform 0.14s ease;
+}
+
+.trash-pile-btn:disabled {
+  cursor: default;
+}
+
+.trash-pile-btn.is-clickable {
+  cursor: pointer;
+}
+
+.trash-pile-btn.is-clickable:hover {
+  transform: translateY(-2px);
+}
+
+.trash-active-card-wrap {
+  width: var(--card-w);
+  height: var(--card-h);
+}
+
+.trash-player-zone {
+  flex-shrink: 0;
+  background: rgba(20, 12, 7, 0.42);
+  border: 1px solid rgba(255, 246, 233, 0.16);
+  border-radius: 18px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.trash-player-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.trash-player-header strong {
+  font-size: 0.9rem;
+  color: #fffaf2;
+}
+
+.trash-player-header span {
+  font-size: 0.76rem;
+  color: rgba(255, 246, 233, 0.82);
+}
+
+.trash-slots-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: clamp(6px, 1.2vw, 10px);
+  justify-items: center;
+}
+
+.trash-slot-btn {
+  position: relative;
+  padding: 0;
+  border-radius: var(--card-radius);
+  transition: transform 0.14s ease;
+}
+
+.trash-slot-btn:disabled {
+  cursor: default;
+}
+
+.trash-slot-btn.is-valid-target {
+  cursor: pointer;
+}
+
+.trash-slot-btn.is-valid-target:hover {
+  transform: translateY(-3px);
+}
+
+.trash-slot-num {
+  position: absolute;
+  top: 4px;
+  left: 5px;
+  z-index: 2;
+  background: rgba(20, 12, 7, 0.72);
+  color: #fffaf2;
+  font-size: 0.68rem;
+  font-weight: 800;
+  padding: 1px 5px;
+  border-radius: 6px;
+  pointer-events: none;
+}
+
+.gofish-handoff-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 22px 16px;
+  border-radius: 16px;
+  background: rgba(20, 12, 7, 0.42);
+  border: 2px dashed rgba(255, 246, 233, 0.28);
+  text-align: center;
+  color: #fffaf2;
+}
+
+.gofish-handoff-card p {
+  margin: 0;
+  font-size: 0.98rem;
+}
