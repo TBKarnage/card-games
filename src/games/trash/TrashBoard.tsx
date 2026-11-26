@@ -32,14 +32,25 @@ import {
 import type { TrashMatchMode, TrashPlayerCount, TrashState } from './types'
 
 interface TrashBoardProps {
+  playerCount: TrashPlayerCount
+  humanCount: 1 | 2
+  matchMode: TrashMatchMode
   cardBackId: Parameters<typeof PlayingCard>[0]['cardBackId']
   largePrint: boolean
   soundEnabled: boolean
+  isSetupOpen: boolean
+  onSetSetupOpen: (open: boolean) => void
+  onChangeSetup: (
+    playerCount: TrashPlayerCount,
+    matchMode: TrashMatchMode,
+    humanCount: 1 | 2
+  ) => void
   onBackToHub: () => void
   onOpenCustomize: () => void
   onOpenSettings: () => void
   onToggleSound: () => void
   onRecordWin: (moves: number, elapsedSeconds: number) => string[]
+  onRecordLoss: () => void
 }
 
 function formatTime(seconds: number): string {
@@ -62,26 +73,29 @@ function getAvatarEmoji(avatar: 'you' | 'bear' | 'fox' | 'owl'): string {
 }
 
 export function TrashBoard({
+  playerCount,
+  humanCount,
+  matchMode,
   cardBackId,
   largePrint,
   soundEnabled,
+  isSetupOpen,
+  onSetSetupOpen,
+  onChangeSetup,
   onBackToHub,
   onOpenCustomize,
   onOpenSettings,
   onToggleSound,
   onRecordWin,
+  onRecordLoss,
 }: TrashBoardProps) {
-  const [playerCount, setPlayerCount] = useState<TrashPlayerCount>(2)
-  const [humanCount, setHumanCount] = useState<1 | 2>(1)
-  const [matchMode, setMatchMode] = useState<TrashMatchMode>('quick')
-  const [draftPlayers, setDraftPlayers] = useState<TrashPlayerCount>(2)
-  const [draftHumanCount, setDraftHumanCount] = useState<1 | 2>(1)
-  const [draftMode, setDraftMode] = useState<TrashMatchMode>('quick')
-  const [showSetup, setShowSetup] = useState(true)
+  const [draftPlayers, setDraftPlayers] = useState<TrashPlayerCount>(playerCount)
+  const [draftHumanCount, setDraftHumanCount] = useState<1 | 2>(humanCount)
+  const [draftMode, setDraftMode] = useState<TrashMatchMode>(matchMode)
   const [hasStarted, setHasStarted] = useState(false)
 
   const [gameState, setGameState] = useState<TrashState>(() =>
-    createTrashGame(2, 'quick', Math.random, 1)
+    createTrashGame(playerCount, matchMode, Math.random, humanCount)
   )
   const [elapsedSeconds, setElapsedSeconds] = useState(0)
   const [newUnlocks, setNewUnlocks] = useState<string[]>([])
@@ -100,12 +114,12 @@ export function TrashBoard({
   const isGameOver = gameState.phase === 'game-over'
 
   useEffect(() => {
-    if (isGameOver || isRoundOver || showSetup) return
+    if (isGameOver || isRoundOver || isSetupOpen) return
     const timer = window.setInterval(() => {
       setElapsedSeconds((prev) => prev + 1)
     }, 1000)
     return () => window.clearInterval(timer)
-  }, [isGameOver, isRoundOver, showSetup])
+  }, [isGameOver, isRoundOver, isSetupOpen])
 
   const handleGameOverCheck = useCallback(
     (nextState: TrashState) => {
@@ -120,13 +134,14 @@ export function TrashBoard({
         setNewUnlocks(unlocked)
       } else {
         soundFX.playCardPlace()
+        onRecordLoss()
       }
     },
-    [elapsedSeconds, onRecordWin]
+    [elapsedSeconds, onRecordWin, onRecordLoss]
   )
 
   useEffect(() => {
-    if (showSetup || gameState.phase !== 'bot-turn') return
+    if (isSetupOpen || gameState.phase !== 'bot-turn') return
     const timer = window.setTimeout(() => {
       const next = stepBotTrashTurn(gameState)
       if (next.phase === 'human-draw') {
@@ -138,7 +153,7 @@ export function TrashBoard({
       handleGameOverCheck(next)
     }, 750)
     return () => window.clearTimeout(timer)
-  }, [gameState, showSetup, handleGameOverCheck])
+  }, [gameState, isSetupOpen, handleGameOverCheck])
 
   const startNewGame = useCallback(
     (
@@ -150,14 +165,15 @@ export function TrashBoard({
       winRecordedRef.current = false
       setNewUnlocks([])
       setElapsedSeconds(0)
-      setPlayerCount(nextPlayers)
-      setHumanCount(nextHumans)
-      setMatchMode(nextMode)
+      setDraftPlayers(nextPlayers)
+      setDraftHumanCount(nextHumans)
+      setDraftMode(nextMode)
+      onChangeSetup(nextPlayers, nextMode, nextHumans)
       setGameState(createTrashGame(nextPlayers, nextMode, Math.random, nextHumans))
       setHasStarted(true)
-      setShowSetup(false)
+      onSetSetupOpen(false)
     },
-    [playerCount, matchMode, humanCount]
+    [playerCount, matchMode, humanCount, onChangeSetup, onSetSetupOpen]
   )
 
   const openSetupModal = () => {
@@ -165,7 +181,19 @@ export function TrashBoard({
     setDraftPlayers(playerCount)
     setDraftHumanCount(humanCount)
     setDraftMode(matchMode)
-    setShowSetup(true)
+    onSetSetupOpen(true)
+  }
+
+  const closeSetupModal = () => {
+    soundFX.playButtonTap()
+    setDraftPlayers(playerCount)
+    setDraftHumanCount(humanCount)
+    setDraftMode(matchMode)
+    if (hasStarted) {
+      onSetSetupOpen(false)
+    } else {
+      onBackToHub()
+    }
   }
 
   const validHumanSlots = useMemo(() => {
@@ -179,14 +207,14 @@ export function TrashBoard({
     validHumanSlots.length === 0
 
   const handleDraw = (source: 'stock' | 'discard') => {
-    if (gameState.phase !== 'human-draw' || showSetup) return
+    if (gameState.phase !== 'human-draw' || isSetupOpen) return
     soundFX.playCardFlip()
     const next = drawFromTrashPile(gameState, source)
     setGameState(next)
   }
 
   const handlePlaceInSlot = (slotIdx: number) => {
-    if (gameState.phase !== 'human-place' || showSetup) return
+    if (gameState.phase !== 'human-place' || isSetupOpen) return
     if (!validHumanSlots.includes(slotIdx)) {
       soundFX.playCardError()
       return
@@ -198,7 +226,7 @@ export function TrashBoard({
   }
 
   const handleDiscard = () => {
-    if (!canDiscardHuman || showSetup) return
+    if (!canDiscardHuman || isSetupOpen) return
     soundFX.playCardPlace()
     const next = discardActiveTrashCard(gameState)
     setGameState(next)
@@ -491,7 +519,7 @@ export function TrashBoard({
         </section>
       </main>
 
-      {showSetup && (
+      {isSetupOpen && (
         <div
           className="modal-backdrop"
           role="dialog"
@@ -509,14 +537,7 @@ export function TrashBoard({
               <button
                 type="button"
                 className="icon-btn"
-                onClick={() => {
-                  soundFX.playButtonTap()
-                  if (hasStarted) {
-                    setShowSetup(false)
-                  } else {
-                    onBackToHub()
-                  }
-                }}
+                onClick={closeSetupModal}
                 aria-label={hasStarted ? 'Close setup' : 'Back to games'}
               >
                 <X size={20} />
@@ -648,14 +669,7 @@ export function TrashBoard({
                 <button
                   type="button"
                   className="btn-secondary"
-                  onClick={() => {
-                    soundFX.playButtonTap()
-                    if (hasStarted) {
-                      setShowSetup(false)
-                    } else {
-                      onBackToHub()
-                    }
-                  }}
+                  onClick={closeSetupModal}
                 >
                   {hasStarted ? 'Keep Playing' : 'Back to Games'}
                 </button>

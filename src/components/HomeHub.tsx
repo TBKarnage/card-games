@@ -29,7 +29,7 @@ export function HomeHub({
   onOpenSettings,
   onToggleSound,
 }: HomeHubProps) {
-  const { stats, settings } = profile
+  const { gameStats, settings } = profile
 
   return (
     <div className="hub-shell">
@@ -93,72 +93,80 @@ export function HomeHub({
       </header>
 
       <main className="hub-main">
-        <section className="hub-stats-strip" aria-label="Player stats">
-          <div className="stat-chip">
-            <Trophy size={16} />
-            <span>
-              <strong>{stats.gamesWon}</strong> {stats.gamesWon === 1 ? 'Win' : 'Wins'}
-            </span>
-          </div>
-          <div className="stat-chip">
-            <Flame size={16} />
-            <span>
-              <strong>{stats.currentStreak}</strong> Streak
-            </span>
-          </div>
-          {stats.bestMoves !== null && (
-            <div className="stat-chip">
-              <span>
-                Best: <strong>{stats.bestMoves}</strong> moves
-              </span>
-            </div>
-          )}
-        </section>
-
         <section className="games-grid" aria-label="Card games shelf">
-          {CARD_GAMES_REGISTRY.map((game) => (
-            <article
-              key={game.id}
-              className={`game-card ${game.available ? 'is-available' : 'is-upcoming'}`}
-            >
-              <div className="game-card-top">
-                <span
-                  className="game-badge"
-                  style={{
-                    backgroundColor: game.available ? game.accent : 'rgba(255,255,255,0.16)',
-                  }}
-                >
-                  {game.badge}
-                </span>
-                <span className="game-meta-tags">
-                  {game.playersLabel} • {game.ageLabel}
-                </span>
-              </div>
-
-              <div className="game-card-body">
-                <h2>{game.title}</h2>
-                <p>{game.subtitle}</p>
-              </div>
-
-              <div className="game-card-footer">
-                {game.available ? (
-                  <button
-                    type="button"
-                    className="btn-play"
-                    onClick={() => {
-                      soundFX.playCardFlip()
-                      onLaunchGame(game.id)
+          {CARD_GAMES_REGISTRY.map((game) => {
+            const stats = gameStats[game.id]
+            return (
+              <article
+                key={game.id}
+                className={`game-card ${game.available ? 'is-available' : 'is-upcoming'}`}
+              >
+                <div className="game-card-top">
+                  <span
+                    className="game-badge"
+                    style={{
+                      backgroundColor: game.available ? game.accent : 'rgba(255,255,255,0.16)',
                     }}
                   >
-                    <Play size={18} fill="currentColor" />
-                    <span>Play</span>
-                  </button>
-                ) : (
-                  <div className="coming-soon-pill">On the shelf soon</div>
-                )}
-              </div>
-            </article>
-          ))}
+                    {game.badge}
+                  </span>
+                  <span className="game-meta-tags">
+                    {game.playersLabel} • {game.ageLabel}
+                  </span>
+                </div>
+
+                <div className="game-card-body">
+                  <h2>{game.title}</h2>
+                  <p>{game.subtitle}</p>
+                </div>
+
+                <div className="game-card-stats" aria-label={`${game.title} stats`}>
+                  <div className="game-stat-cell">
+                    <span className="game-stat-label">
+                      <Trophy size={12} aria-hidden="true" />
+                      <span>{stats.gamesWon === 1 ? 'Win' : 'Wins'}</span>
+                    </span>
+                    <strong>{stats.gamesWon}</strong>
+                  </div>
+                  <div className="game-stat-cell">
+                    <span className="game-stat-label">
+                      <Flame size={12} aria-hidden="true" />
+                      <span>Streak</span>
+                    </span>
+                    <strong>{stats.currentStreak}</strong>
+                  </div>
+                  <div className="game-stat-cell">
+                    <span className="game-stat-label">
+                      <span>Best</span>
+                    </span>
+                    <strong>
+                      {stats.bestMoves !== null
+                        ? `${stats.bestMoves} ${game.bestScoreUnit}`
+                        : '—'}
+                    </strong>
+                  </div>
+                </div>
+
+                <div className="game-card-footer">
+                  {game.available ? (
+                    <button
+                      type="button"
+                      className="btn-play"
+                      onClick={() => {
+                        soundFX.playCardFlip()
+                        onLaunchGame(game.id)
+                      }}
+                    >
+                      <Play size={18} fill="currentColor" />
+                      <span>Play</span>
+                    </button>
+                  ) : (
+                    <div className="coming-soon-pill">On the shelf soon</div>
+                  )}
+                </div>
+              </article>
+            )
+          })}
         </section>
       </main>
     </div>

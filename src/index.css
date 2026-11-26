@@ -240,24 +240,6 @@ button {
   transform: scale(0.95);
 }
 
-.hub-stats-strip {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-  margin-bottom: 22px;
-}
-
-.stat-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  padding: 7px 13px;
-  border-radius: 999px;
-  background: rgba(20, 12, 7, 0.28);
-  border: 1px solid rgba(255, 246, 233, 0.14);
-  font-size: 0.88rem;
-}
-
 .games-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
@@ -270,7 +252,7 @@ button {
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  gap: 16px;
+  gap: 14px;
   background: rgba(255, 250, 241, 0.11);
   border: 1px solid rgba(255, 250, 241, 0.2);
   box-shadow: 0 12px 30px rgba(0, 0, 0, 0.22);
@@ -309,6 +291,10 @@ button {
   font-weight: 600;
 }
 
+.game-card-body {
+  flex: 1;
+}
+
 .game-card-body h2 {
   margin: 0 0 6px;
   font-family: var(--font-display);
@@ -321,6 +307,54 @@ button {
   font-size: 0.92rem;
   line-height: 1.45;
   color: rgba(255, 246, 233, 0.85);
+}
+
+.game-card-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  padding: 9px 6px;
+  border-radius: 14px;
+  background: rgba(20, 12, 7, 0.28);
+  border: 1px solid rgba(255, 246, 233, 0.13);
+}
+
+.game-stat-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  padding: 0 6px;
+  min-width: 0;
+  text-align: center;
+}
+
+.game-stat-cell + .game-stat-cell {
+  border-left: 1px solid rgba(255, 246, 233, 0.12);
+}
+
+.game-stat-label {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  font-size: 0.66rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: rgba(255, 246, 233, 0.72);
+  white-space: nowrap;
+}
+
+.game-stat-cell strong {
+  font-size: 0.86rem;
+  font-weight: 800;
+  color: #fffaf2;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
 }
 
 .btn-play {
@@ -458,6 +492,15 @@ button {
   border: 1px solid rgba(255, 250, 241, 0.22);
   font-size: 0.78rem;
   font-weight: 700;
+  transition: background 0.15s ease, transform 0.12s ease;
+}
+
+.draw-pill:hover {
+  background: rgba(255, 250, 241, 0.26);
+}
+
+.draw-pill:active {
+  transform: scale(0.96);
 }
 
 .hint-banner {
@@ -967,6 +1010,40 @@ button {
   display: flex;
   flex-direction: column;
   gap: 12px;
+}
+
+.game-settings-shortcut {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: #f1e3cb;
+  border: 1.5px solid #dec7a4;
+  color: #2c1e14;
+  text-align: left;
+  transition: background 0.14s ease, transform 0.12s ease;
+}
+
+.game-settings-shortcut:hover {
+  background: #ead7b7;
+}
+
+.game-settings-shortcut:active {
+  transform: scale(0.99);
+}
+
+.game-settings-shortcut strong {
+  display: block;
+  font-size: 0.92rem;
+}
+
+.game-settings-shortcut small {
+  display: block;
+  font-size: 0.78rem;
+  color: #6b5341;
 }
 
 .toggle-row {
@@ -2084,6 +2161,9 @@ button {
   background: rgba(20, 12, 7, 0.42);
   border: 1px solid rgba(255, 246, 233, 0.16);
   flex-shrink: 0;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
 }
 
 .gofish-player-bar {
@@ -2143,13 +2223,79 @@ button {
   font-weight: 800;
 }
 
+.gofish-hand-scroller {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  min-width: 0;
+}
+
+.gofish-scroll-btn {
+  width: 34px;
+  height: 52px;
+  border-radius: 12px;
+  background: rgba(255, 250, 241, 0.16);
+  border: 1px solid rgba(255, 250, 241, 0.24);
+  color: #fffaf2;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: background 0.15s ease, transform 0.12s ease, opacity 0.15s ease;
+}
+
+.gofish-scroll-btn:hover:not(:disabled) {
+  background: rgba(255, 250, 241, 0.28);
+}
+
+.gofish-scroll-btn:active:not(:disabled) {
+  transform: scale(0.95);
+}
+
+.gofish-scroll-btn:disabled {
+  opacity: 0.32;
+  cursor: default;
+}
+
 .gofish-hand-row {
+  flex: 1;
+  min-width: 0;
+  width: 100%;
   display: flex;
   align-items: flex-end;
   gap: clamp(4px, 1vw, 8px);
   overflow-x: auto;
-  padding: 8px 4px 4px;
+  overflow-y: hidden;
+  padding: 10px 6px 8px;
   -webkit-overflow-scrolling: touch;
+  touch-action: pan-x;
+  overscroll-behavior-x: contain;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 246, 233, 0.42) rgba(20, 12, 7, 0.28);
+}
+
+.gofish-hand-row::-webkit-scrollbar {
+  height: 7px;
+}
+
+.gofish-hand-row::-webkit-scrollbar-track {
+  background: rgba(20, 12, 7, 0.28);
+  border-radius: 999px;
+}
+
+.gofish-hand-row::-webkit-scrollbar-thumb {
+  background: rgba(255, 246, 233, 0.4);
+  border-radius: 999px;
+}
+
+.gofish-hand-row::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 246, 233, 0.58);
+}
+
+.gofish-hand-row .playing-card {
+  touch-action: pan-x;
+  cursor: pointer;
 }
 
 .gofish-hand-card-wrap {

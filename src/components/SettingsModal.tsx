@@ -1,17 +1,19 @@
 import { useState } from 'react'
 import {
   Check,
+  ChevronRight,
   Copy,
   ExternalLink,
   Lock,
   MessageSquareHeart,
+  SlidersHorizontal,
   Trash2,
   Unlock,
   Volume2,
   VolumeX,
   X,
 } from 'lucide-react'
-import { APP_DEFAULTS, type DrawCount, type SolitaireDifficulty } from '../config/appDefaults'
+import { APP_DEFAULTS } from '../config/appDefaults'
 import { soundFX } from '../utils/audio'
 import type { FeedbackReport, ParentBackendConfig, PlayerSettings } from '../utils/storage'
 
@@ -21,23 +23,14 @@ interface SettingsModalProps {
   settings: PlayerSettings
   reports: FeedbackReport[]
   parentConfig: ParentBackendConfig
+  activeGameTitle?: string
+  onOpenGameSetup?: () => void
   onUpdateSettings: (patch: Partial<PlayerSettings>) => void
   onUpdateParentConfig: (patch: Partial<ParentBackendConfig>) => void
   onOpenFeedback: () => void
   onResetStats: () => void
   onClearReports: () => void
 }
-
-const DIFFICULTY_OPTIONS: { id: SolitaireDifficulty; label: string; hint: string }[] = [
-  { id: 'easy', label: 'Easy', hint: 'Gentler opening deals' },
-  { id: 'normal', label: 'Normal', hint: 'Classic random shuffle' },
-  { id: 'hard', label: 'Hard', hint: 'Trickier opening deals' },
-]
-
-const DRAW_OPTIONS: { id: DrawCount; label: string }[] = [
-  { id: 1, label: 'Draw 1' },
-  { id: 3, label: 'Draw 3' },
-]
 
 function buildGitHubIssueUrl(repo: string, report: FeedbackReport): string {
   const cleanRepo = repo.trim().replace(/^https?:\/\/github\.com\//, '').replace(/\/+$/, '')
@@ -66,6 +59,8 @@ export function SettingsModal({
   settings,
   reports,
   parentConfig,
+  activeGameTitle,
+  onOpenGameSetup,
   onUpdateSettings,
   onUpdateParentConfig,
   onOpenFeedback,
@@ -124,7 +119,7 @@ export function SettingsModal({
         <div className="modal-header">
           <div>
             <h2>Settings</h2>
-            <p className="modal-subtitle">Sound, Solitaire difficulty &amp; family options</p>
+            <p className="modal-subtitle">Sound, card display &amp; family options</p>
           </div>
           <button type="button" className="icon-btn" onClick={handleClose} aria-label="Close settings">
             <X size={20} />
@@ -133,6 +128,27 @@ export function SettingsModal({
 
         <div className="modal-body">
           <div className="settings-group">
+            {activeGameTitle && onOpenGameSetup && (
+              <button
+                type="button"
+                className="game-settings-shortcut"
+                onClick={() => {
+                  soundFX.playButtonTap()
+                  onClose()
+                  onOpenGameSetup()
+                }}
+              >
+                <div className="toggle-label-with-icon">
+                  <SlidersHorizontal size={18} />
+                  <div>
+                    <strong>{activeGameTitle} Settings</strong>
+                    <small>Change setup, players &amp; rules for this game</small>
+                  </div>
+                </div>
+                <ChevronRight size={18} />
+              </button>
+            )}
+
             <label className="toggle-row">
               <div className="toggle-label-with-icon">
                 {settings.soundEnabled ? <Volume2 size={18} /> : <VolumeX size={18} />}
@@ -167,54 +183,6 @@ export function SettingsModal({
                 }}
               />
             </label>
-
-            <div className="setting-row-stack">
-              <div>
-                <strong>Solitaire Difficulty</strong>
-                <small>
-                  {DIFFICULTY_OPTIONS.find((d) => d.id === settings.difficulty)?.hint}
-                </small>
-              </div>
-              <div className="segmented-control segmented-control--3" role="group" aria-label="Difficulty">
-                {DIFFICULTY_OPTIONS.map((opt) => (
-                  <button
-                    key={opt.id}
-                    type="button"
-                    className={`seg-btn ${settings.difficulty === opt.id ? 'is-active' : ''}`}
-                    onClick={() => {
-                      soundFX.playButtonTap()
-                      onUpdateSettings({ difficulty: opt.id })
-                    }}
-                  >
-                    {opt.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div className="setting-row-stack">
-              <div>
-                <strong>Solitaire Draw Mode</strong>
-                <small>
-                  {settings.drawCount === 3 ? 'Flip 3 cards at a time' : 'Flip 1 card at a time'}
-                </small>
-              </div>
-              <div className="segmented-control" role="group" aria-label="Draw mode">
-                {DRAW_OPTIONS.map((opt) => (
-                  <button
-                    key={opt.id}
-                    type="button"
-                    className={`seg-btn ${settings.drawCount === opt.id ? 'is-active' : ''}`}
-                    onClick={() => {
-                      soundFX.playButtonTap()
-                      onUpdateSettings({ drawCount: opt.id })
-                    }}
-                  >
-                    {opt.label}
-                  </button>
-                ))}
-              </div>
-            </div>
           </div>
 
           <div className="settings-group">
@@ -243,7 +211,7 @@ export function SettingsModal({
               </button>
             ) : (
               <div className="confirm-row">
-                <span>Reset all saved wins &amp; best times?</span>
+                <span>Reset all saved wins, streaks &amp; best scores for every game?</span>
                 <div className="confirm-actions">
                   <button
                     type="button"

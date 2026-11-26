@@ -37,14 +37,20 @@ import type {
 } from './types'
 
 interface MemoryBoardProps {
+  gridSize: MemoryGridSize
+  playerMode: MemoryPlayerMode
   cardBackId: CardBackId
   largePrint: boolean
   soundEnabled: boolean
+  isSetupOpen: boolean
+  onSetSetupOpen: (open: boolean) => void
+  onChangeSetup: (gridSize: MemoryGridSize, playerMode: MemoryPlayerMode) => void
   onBackToHub: () => void
   onOpenCustomize: () => void
   onOpenSettings: () => void
   onToggleSound: () => void
   onRecordWin: (moves: number, seconds: number) => string[]
+  onRecordLoss: () => void
 }
 
 function formatTime(totalSeconds: number): string {
@@ -54,23 +60,26 @@ function formatTime(totalSeconds: number): string {
 }
 
 export function MemoryBoard({
+  gridSize,
+  playerMode,
   cardBackId,
   largePrint,
   soundEnabled,
+  isSetupOpen,
+  onSetSetupOpen,
+  onChangeSetup,
   onBackToHub,
   onOpenCustomize,
   onOpenSettings,
   onToggleSound,
   onRecordWin,
+  onRecordLoss,
 }: MemoryBoardProps) {
-  const [gridSize, setGridSize] = useState<MemoryGridSize>('3x4')
-  const [playerMode, setPlayerMode] = useState<MemoryPlayerMode>(1)
-  const [draftGridSize, setDraftGridSize] = useState<MemoryGridSize>('3x4')
-  const [draftPlayerMode, setDraftPlayerMode] = useState<MemoryPlayerMode>(1)
-  const [isSetupOpen, setIsSetupOpen] = useState(true)
+  const [draftGridSize, setDraftGridSize] = useState<MemoryGridSize>(gridSize)
+  const [draftPlayerMode, setDraftPlayerMode] = useState<MemoryPlayerMode>(playerMode)
   const [hasStarted, setHasStarted] = useState(false)
   const [game, setGame] = useState<MemoryGameState>(() =>
-    createMemoryGame('3x4', 1)
+    createMemoryGame(gridSize, playerMode)
   )
   const [elapsedSeconds, setElapsedSeconds] = useState(0)
   const [newlyUnlocked, setNewlyUnlocked] = useState<string[]>([])
@@ -90,16 +99,6 @@ export function MemoryBoard({
     return () => window.clearInterval(id)
   }, [won, isSetupOpen])
 
-  // Record win once
-  useEffect(() => {
-    if (won && !winRecordedRef.current) {
-      winRecordedRef.current = true
-      soundFX.playWinFanfare()
-      const unlocks = onRecordWin(game.moves, elapsedSeconds)
-      setNewlyUnlocked(unlocks)
-    }
-  }, [won, game.moves, elapsedSeconds, onRecordWin])
-
   // Auto-flip back mismatched pair after a friendly pause
   useEffect(() => {
     if (!game.isResolvingMismatch) return
@@ -110,14 +109,14 @@ export function MemoryBoard({
     return () => window.clearTimeout(id)
   }, [game.isResolvingMismatch])
 
-  const executeFlip = useCallback((cardId: string) => {
-    setGame((prev) => {
-      const target = prev.cards.find((c) => c.id === cardId)
+  const executeFlip = useCallback(
+    (cardId: string) => {
+      const target = game.cards.find((c) => c.id === cardId)
       if (target) {
         botMemoryRef.current[target.id] = target.symbolId
       }
-      const result = flipMemoryCard(prev, cardId)
-      if (result.outcome === 'ignored') return prev
+      const result = flipMemoryCard(game, cardId)
+      if (result.outcome === 'ignored') return
 
       if (result.outcome === 'first-flip') {
         soundFX.playCardFlip()
@@ -126,9 +125,25 @@ export function MemoryBoard({
       } else if (result.outcome === 'mismatch') {
         soundFX.playCardError()
       }
-      return result.nextState
-    })
-  }, [])
+
+      setGame(result.nextState)
+
+      if (isMemoryWon(result.nextState) && !winRecordedRef.current) {
+        winRecordedRef.current = true
+        const botWon =
+          playerMode === 'bot' && result.nextState.scores[1] > result.nextState.scores[0]
+        if (botWon) {
+          soundFX.playCardPlace()
+          onRecordLoss()
+        } else {
+          soundFX.playWinFanfare()
+          const unlocks = onRecordWin(result.nextState.moves, elapsedSeconds)
+          setNewlyUnlocked(unlocks)
+        }
+      }
+    },
+    [game, playerMode, elapsedSeconds, onRecordWin, onRecordLoss]
+  )
 
   // Barnaby Bot turn automation when playing vs Robot
   useEffect(() => {
@@ -164,20 +179,32 @@ export function MemoryBoard({
       botMemoryRef.current = {}
       setNewlyUnlocked([])
       setElapsedSeconds(0)
-      setGridSize(nextGrid)
-      setPlayerMode(nextPlayers)
+      setDraftGridSize(nextGrid)
+      setDraftPlayerMode(nextPlayers)
+      onChangeSetup(nextGrid, nextPlayers)
       setGame(createMemoryGame(nextGrid, nextPlayers))
       setHasStarted(true)
-      setIsSetupOpen(false)
+      onSetSetupOpen(false)
     },
-    [gridSize, playerMode]
+    [gridSize, playerMode, onChangeSetup, onSetSetupOpen]
   )
 
   const openSetupMenu = () => {
     soundFX.playButtonTap()
     setDraftGridSize(gridSize)
     setDraftPlayerMode(playerMode)
-    setIsSetupOpen(true)
+    onSetSetupOpen(true)
+  }
+
+  const closeSetupMenu = () => {
+    soundFX.playButtonTap()
+    setDraftGridSize(gridSize)
+    setDraftPlayerMode(playerMode)
+    if (hasStarted) {
+      onSetSetupOpen(false)
+    } else {
+      onBackToHub()
+    }
   }
 
   const handleCardTap = (cardId: string) => {
@@ -388,14 +415,7 @@ export function MemoryBoard({
               <button
                 type="button"
                 className="icon-btn"
-                onClick={() => {
-                  soundFX.playButtonTap()
-                  if (hasStarted) {
-                    setIsSetupOpen(false)
-                  } else {
-                    onBackToHub()
-                  }
-                }}
+                onClick={closeSetupMenu}
                 aria-label={hasStarted ? 'Close setup' : 'Back to games'}
               >
                 <X size={20} />
@@ -506,14 +526,7 @@ export function MemoryBoard({
                 <button
                   type="button"
                   className="btn-secondary"
-                  onClick={() => {
-                    soundFX.playButtonTap()
-                    if (hasStarted) {
-                      setIsSetupOpen(false)
-                    } else {
-                      onBackToHub()
-                    }
-                  }}
+                  onClick={closeSetupMenu}
                 >
                   {hasStarted ? 'Keep Playing' : 'Back to Games'}
                 </button>
@@ -566,7 +579,7 @@ export function MemoryBoard({
                 className="btn-secondary"
                 onClick={openSetupMenu}
               >
-                Change Size / Players
+                Change Setup
               </button>
               <button
                 type="button"

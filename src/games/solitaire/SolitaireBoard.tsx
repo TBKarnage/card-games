@@ -40,6 +40,8 @@ interface SolitaireBoardProps {
   cardBackId: CardBackId
   largePrint: boolean
   soundEnabled: boolean
+  isSetupOpen: boolean
+  onSetSetupOpen: (open: boolean) => void
   onChangeSetup: (difficulty: SolitaireDifficulty, drawCount: DrawCount) => void
   onBackToHub: () => void
   onOpenCustomize: () => void
@@ -101,6 +103,8 @@ export function SolitaireBoard({
   cardBackId,
   largePrint,
   soundEnabled,
+  isSetupOpen,
+  onSetSetupOpen,
   onChangeSetup,
   onBackToHub,
   onOpenCustomize,
@@ -110,7 +114,6 @@ export function SolitaireBoard({
 }: SolitaireBoardProps) {
   const [draftDifficulty, setDraftDifficulty] = useState<SolitaireDifficulty>(difficulty)
   const [draftDrawCount, setDraftDrawCount] = useState<DrawCount>(drawCount)
-  const [isSetupOpen, setIsSetupOpen] = useState(true)
   const [hasStarted, setHasStarted] = useState(false)
 
   const [gameState, setGameState] = useState<SolitaireState>(() =>
@@ -186,19 +189,32 @@ export function SolitaireBoard({
       setHint(null)
       setUndoStack([])
       setElapsedSeconds(0)
+      setDraftDifficulty(nextDifficulty)
+      setDraftDrawCount(nextDrawCount)
       onChangeSetup(nextDifficulty, nextDrawCount)
       setGameState(dealKlondike(nextDrawCount, Math.random, nextDifficulty))
       setHasStarted(true)
-      setIsSetupOpen(false)
+      onSetSetupOpen(false)
     },
-    [difficulty, drawCount, onChangeSetup]
+    [difficulty, drawCount, onChangeSetup, onSetSetupOpen]
   )
 
   const openSetupMenu = () => {
     soundFX.playButtonTap()
     setDraftDifficulty(difficulty)
     setDraftDrawCount(drawCount)
-    setIsSetupOpen(true)
+    onSetSetupOpen(true)
+  }
+
+  const closeSetupMenu = () => {
+    soundFX.playButtonTap()
+    setDraftDifficulty(difficulty)
+    setDraftDrawCount(drawCount)
+    if (hasStarted) {
+      onSetSetupOpen(false)
+    } else {
+      onBackToHub()
+    }
   }
 
   const commitMove = useCallback(
@@ -764,14 +780,7 @@ export function SolitaireBoard({
               <button
                 type="button"
                 className="icon-btn"
-                onClick={() => {
-                  soundFX.playButtonTap()
-                  if (hasStarted) {
-                    setIsSetupOpen(false)
-                  } else {
-                    onBackToHub()
-                  }
-                }}
+                onClick={closeSetupMenu}
                 aria-label={hasStarted ? 'Close setup' : 'Back to games'}
               >
                 <X size={20} />
@@ -845,14 +854,7 @@ export function SolitaireBoard({
                 <button
                   type="button"
                   className="btn-secondary"
-                  onClick={() => {
-                    soundFX.playButtonTap()
-                    if (hasStarted) {
-                      setIsSetupOpen(false)
-                    } else {
-                      onBackToHub()
-                    }
-                  }}
+                  onClick={closeSetupMenu}
                 >
                   {hasStarted ? 'Keep Playing' : 'Back to Games'}
                 </button>

@@ -2,6 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   ArrowLeft,
   Bot,
+  ChevronLeft,
+  ChevronRight,
   Fish,
   Palette,
   Play,
@@ -33,14 +35,25 @@ import {
 import type { GoFishDifficulty, GoFishPlayer, GoFishPlayerCount, GoFishState } from './types'
 
 interface GoFishBoardProps {
+  playerCount: GoFishPlayerCount
+  humanCount: 1 | 2
+  difficulty: GoFishDifficulty
   cardBackId: CardBackId
   largePrint: boolean
   soundEnabled: boolean
+  isSetupOpen: boolean
+  onSetSetupOpen: (open: boolean) => void
+  onChangeSetup: (
+    playerCount: GoFishPlayerCount,
+    difficulty: GoFishDifficulty,
+    humanCount: 1 | 2
+  ) => void
   onBackToHub: () => void
   onOpenCustomize: () => void
   onOpenSettings: () => void
   onToggleSound: () => void
   onRecordWin: (moves: number, seconds: number) => string[]
+  onRecordLoss: () => void
 }
 
 function formatTime(totalSeconds: number): string {
@@ -63,30 +76,37 @@ function getAvatarEmoji(avatar: GoFishPlayer['avatar']): string {
 }
 
 export function GoFishBoard({
+  playerCount,
+  humanCount,
+  difficulty,
   cardBackId,
   largePrint,
   soundEnabled,
+  isSetupOpen,
+  onSetSetupOpen,
+  onChangeSetup,
   onBackToHub,
   onOpenCustomize,
   onOpenSettings,
   onToggleSound,
   onRecordWin,
+  onRecordLoss,
 }: GoFishBoardProps) {
-  const [playerCount, setPlayerCount] = useState<GoFishPlayerCount>(3)
-  const [humanCount, setHumanCount] = useState<1 | 2>(1)
-  const [difficulty, setDifficulty] = useState<GoFishDifficulty>('gentle')
-  const [draftPlayerCount, setDraftPlayerCount] = useState<GoFishPlayerCount>(3)
-  const [draftHumanCount, setDraftHumanCount] = useState<1 | 2>(1)
-  const [draftDifficulty, setDraftDifficulty] = useState<GoFishDifficulty>('gentle')
-  const [isSetupOpen, setIsSetupOpen] = useState(true)
+  const [draftPlayerCount, setDraftPlayerCount] = useState<GoFishPlayerCount>(playerCount)
+  const [draftHumanCount, setDraftHumanCount] = useState<1 | 2>(humanCount)
+  const [draftDifficulty, setDraftDifficulty] = useState<GoFishDifficulty>(difficulty)
   const [hasStarted, setHasStarted] = useState(false)
 
-  const [game, setGame] = useState<GoFishState>(() => createGoFishGame(3, 'gentle', Math.random, 1))
+  const [game, setGame] = useState<GoFishState>(() =>
+    createGoFishGame(playerCount, difficulty, Math.random, humanCount)
+  )
   const [selectedRank, setSelectedRank] = useState<Rank | null>(null)
   const [elapsedSeconds, setElapsedSeconds] = useState(0)
   const [newlyUnlocked, setNewlyUnlocked] = useState<string[]>([])
+  const [handScroll, setHandScroll] = useState({ canLeft: false, canRight: false })
 
   const winRecordedRef = useRef(false)
+  const handRowRef = useRef<HTMLDivElement | null>(null)
   const activeHuman = useMemo(() => {
     const curr = game.players[game.currentPlayerIndex]
     if (curr?.isHuman) return curr
@@ -98,6 +118,69 @@ export function GoFishBoard({
   )
   const totalBooks = game.players.reduce((sum, p) => sum + p.books.length, 0)
   const gameOver = game.phase === 'game-over'
+
+  const updateHandScrollState = useCallback(() => {
+    const el = handRowRef.current
+    if (!el) {
+      setHandScroll((prev) =>
+        prev.canLeft || prev.canRight ? { canLeft: false, canRight: false } : prev
+      )
+      return
+    }
+    const maxScroll = el.scrollWidth - el.clientWidth
+    const canLeft = el.scrollLeft > 4
+    const canRight = maxScroll - el.scrollLeft > 4
+    setHandScroll((prev) =>
+      prev.canLeft === canLeft && prev.canRight === canRight ? prev : { canLeft, canRight }
+    )
+  }, [])
+
+  // Keep hand scroll indicators in sync on resize, hand changes, and mouse wheel
+  useEffect(() => {
+    const el = handRowRef.current
+    if (!el) return
+
+    const rafId = window.requestAnimationFrame(updateHandScrollState)
+
+    const handleWheel = (e: WheelEvent) => {
+      if (el.scrollWidth <= el.clientWidth) return
+      if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) {
+        e.preventDefault()
+        el.scrollLeft += e.deltaY
+      }
+    }
+
+    el.addEventListener('wheel', handleWheel, { passive: false })
+
+    let observer: ResizeObserver | null = null
+    if (typeof ResizeObserver !== 'undefined') {
+      observer = new ResizeObserver(updateHandScrollState)
+      observer.observe(el)
+    }
+    window.addEventListener('resize', updateHandScrollState)
+
+    return () => {
+      window.cancelAnimationFrame(rafId)
+      el.removeEventListener('wheel', handleWheel)
+      observer?.disconnect()
+      window.removeEventListener('resize', updateHandScrollState)
+    }
+  }, [activeHuman.hand.length, game.phase, updateHandScrollState])
+
+  // Reset scroll to start when active human changes in Pass & Play
+  useEffect(() => {
+    if (handRowRef.current) {
+      handRowRef.current.scrollLeft = 0
+    }
+  }, [activeHuman.id])
+
+  const scrollHandBy = (direction: -1 | 1) => {
+    const el = handRowRef.current
+    if (!el) return
+    soundFX.playButtonTap()
+    const step = Math.max(160, Math.round(el.clientWidth * 0.7))
+    el.scrollBy({ left: direction * step, behavior: 'smooth' })
+  }
 
   // Timer (paused while setup is open or game is over)
   useEffect(() => {
@@ -120,9 +203,10 @@ export function GoFishBoard({
         setNewlyUnlocked(unlocks)
       } else {
         soundFX.playCardPlace()
+        onRecordLoss()
       }
     },
-    [elapsedSeconds, onRecordWin]
+    [elapsedSeconds, onRecordWin, onRecordLoss]
   )
 
   // Bot turn automation
@@ -156,14 +240,15 @@ export function GoFishBoard({
       setNewlyUnlocked([])
       setSelectedRank(null)
       setElapsedSeconds(0)
-      setPlayerCount(nextCount)
-      setHumanCount(nextHumans)
-      setDifficulty(nextDiff)
+      setDraftPlayerCount(nextCount)
+      setDraftHumanCount(nextHumans)
+      setDraftDifficulty(nextDiff)
+      onChangeSetup(nextCount, nextDiff, nextHumans)
       setGame(createGoFishGame(nextCount, nextDiff, Math.random, nextHumans))
       setHasStarted(true)
-      setIsSetupOpen(false)
+      onSetSetupOpen(false)
     },
-    [playerCount, difficulty, humanCount]
+    [playerCount, difficulty, humanCount, onChangeSetup, onSetSetupOpen]
   )
 
   const openSetupMenu = () => {
@@ -171,7 +256,19 @@ export function GoFishBoard({
     setDraftPlayerCount(playerCount)
     setDraftHumanCount(humanCount)
     setDraftDifficulty(difficulty)
-    setIsSetupOpen(true)
+    onSetSetupOpen(true)
+  }
+
+  const closeSetupMenu = () => {
+    soundFX.playButtonTap()
+    setDraftPlayerCount(playerCount)
+    setDraftHumanCount(humanCount)
+    setDraftDifficulty(difficulty)
+    if (hasStarted) {
+      onSetSetupOpen(false)
+    } else {
+      onBackToHub()
+    }
   }
 
   const handleSelectCard = (rank: Rank) => {
@@ -445,7 +542,8 @@ export function GoFishBoard({
           <div className="gofish-player-bar">
             <div className="gofish-player-title">
               <strong>
-                {humanCount === 2 ? `${activeHuman.name}'s Hand` : 'Your Hand'}
+                {humanCount === 2 ? `${activeHuman.name}'s Hand` : 'Your Hand'} (
+                {activeHuman.hand.length})
               </strong>
               <span>
                 {game.phase === 'human-handoff'
@@ -453,6 +551,8 @@ export function GoFishBoard({
                   : game.phase === 'human-pick'
                   ? selectedRank !== null
                     ? `Selected ${getRankLabel(selectedRank)} — tap a friend above!`
+                    : handScroll.canLeft || handScroll.canRight
+                    ? 'Swipe or use arrows to see all cards • tap a card to ask'
                     : 'Tap any card to pick a rank'
                   : game.phase === 'human-go-fish'
                   ? 'Tap the Pond to Go Fish!'
@@ -494,21 +594,55 @@ export function GoFishBoard({
               </button>
             </div>
           ) : (
-            <div className="gofish-hand-row">
-              {activeHuman.hand.map((card) => {
-                const isSelected = selectedRank === card.rank
-                return (
-                  <div key={card.id} className="gofish-hand-card-wrap">
-                    <PlayingCard
-                      card={card}
-                      cardBackId={cardBackId}
-                      largePrint={largePrint}
-                      selected={isSelected}
-                      onClick={() => handleSelectCard(card.rank)}
-                    />
-                  </div>
-                )
-              })}
+            <div className="gofish-hand-scroller">
+              {(handScroll.canLeft || handScroll.canRight) && (
+                <button
+                  type="button"
+                  className="gofish-scroll-btn"
+                  onClick={() => scrollHandBy(-1)}
+                  disabled={!handScroll.canLeft}
+                  aria-label="Scroll hand left"
+                  title="Scroll left"
+                >
+                  <ChevronLeft size={20} />
+                </button>
+              )}
+
+              <div
+                ref={handRowRef}
+                className="gofish-hand-row"
+                onScroll={updateHandScrollState}
+                role="region"
+                aria-label="Scrollable card hand"
+              >
+                {activeHuman.hand.map((card) => {
+                  const isSelected = selectedRank === card.rank
+                  return (
+                    <div key={card.id} className="gofish-hand-card-wrap">
+                      <PlayingCard
+                        card={card}
+                        cardBackId={cardBackId}
+                        largePrint={largePrint}
+                        selected={isSelected}
+                        onClick={() => handleSelectCard(card.rank)}
+                      />
+                    </div>
+                  )
+                })}
+              </div>
+
+              {(handScroll.canLeft || handScroll.canRight) && (
+                <button
+                  type="button"
+                  className="gofish-scroll-btn"
+                  onClick={() => scrollHandBy(1)}
+                  disabled={!handScroll.canRight}
+                  aria-label="Scroll hand right"
+                  title="Scroll right"
+                >
+                  <ChevronRight size={20} />
+                </button>
+              )}
             </div>
           )}
         </section>
@@ -533,14 +667,7 @@ export function GoFishBoard({
               <button
                 type="button"
                 className="icon-btn"
-                onClick={() => {
-                  soundFX.playButtonTap()
-                  if (hasStarted) {
-                    setIsSetupOpen(false)
-                  } else {
-                    onBackToHub()
-                  }
-                }}
+                onClick={closeSetupMenu}
                 aria-label={hasStarted ? 'Close setup' : 'Back to games'}
               >
                 <X size={20} />
@@ -674,14 +801,7 @@ export function GoFishBoard({
                 <button
                   type="button"
                   className="btn-secondary"
-                  onClick={() => {
-                    soundFX.playButtonTap()
-                    if (hasStarted) {
-                      setIsSetupOpen(false)
-                    } else {
-                      onBackToHub()
-                    }
-                  }}
+                  onClick={closeSetupMenu}
                 >
                   {hasStarted ? 'Keep Playing' : 'Back to Games'}
                 </button>

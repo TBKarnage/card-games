@@ -1,5 +1,7 @@
+export type GameId = 'solitaire' | 'memory-match' | 'go-fish' | 'trash'
+
 export interface CardGameEntry {
-  id: 'solitaire' | 'memory-match' | 'go-fish' | 'trash'
+  id: GameId
   title: string
   subtitle: string
   playersLabel: string
@@ -7,6 +9,7 @@ export interface CardGameEntry {
   badge: string
   accent: string
   available: boolean
+  bestScoreUnit: 'moves' | 'turns'
 }
 
 export const CARD_GAMES_REGISTRY: CardGameEntry[] = [
@@ -19,6 +22,7 @@ export const CARD_GAMES_REGISTRY: CardGameEntry[] = [
     badge: 'Play Now',
     accent: '#c94a38',
     available: true,
+    bestScoreUnit: 'moves',
   },
   {
     id: 'memory-match',
@@ -29,6 +33,7 @@ export const CARD_GAMES_REGISTRY: CardGameEntry[] = [
     badge: 'Play Now',
     accent: '#3d7057',
     available: true,
+    bestScoreUnit: 'moves',
   },
   {
     id: 'go-fish',
@@ -39,6 +44,7 @@ export const CARD_GAMES_REGISTRY: CardGameEntry[] = [
     badge: 'Play Now',
     accent: '#c47b2b',
     available: true,
+    bestScoreUnit: 'turns',
   },
   {
     id: 'trash',
@@ -49,5 +55,6 @@ export const CARD_GAMES_REGISTRY: CardGameEntry[] = [
     badge: 'Play Now',
     accent: '#7a4b94',
     available: true,
+    bestScoreUnit: 'turns',
   },
 ]
