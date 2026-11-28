@@ -1,4 +1,5 @@
 import {
+  ArrowLeft,
   Flame,
   MessageSquareHeart,
   Palette,
@@ -10,6 +11,7 @@ import {
 } from 'lucide-react'
 import { CARD_GAMES_REGISTRY, type CardGameEntry } from '../games/registry'
 import { soundFX } from '../utils/audio'
+import { navigateToGamesHub } from '../utils/hubNavigation'
 import type { PlayerProfile } from '../utils/storage'
 
 interface HomeHubProps {
@@ -34,14 +36,30 @@ export function HomeHub({
   return (
     <div className="hub-shell">
       <header className="hub-header">
-        <div className="hub-brand">
-          <div className="hub-logo" aria-hidden="true">
-            <span>♠</span>
-            <span className="hub-logo-heart">♥</span>
-          </div>
-          <div>
-            <h1>Cozy Card Table</h1>
-            <p>Family card games for slow evenings &amp; weekend mornings</p>
+        <div className="hub-header-left">
+          <button
+            type="button"
+            className="pill-btn hub-back-btn"
+            onClick={() => {
+              soundFX.playButtonTap()
+              navigateToGamesHub()
+            }}
+            aria-label="Back to Games Hub"
+            title="Back to games.burks.pro"
+          >
+            <ArrowLeft size={16} aria-hidden="true" />
+            <span>Hub</span>
+          </button>
+
+          <div className="hub-brand">
+            <div className="hub-logo" aria-hidden="true">
+              <span>♠</span>
+              <span className="hub-logo-heart">♥</span>
+            </div>
+            <div>
+              <h1>Cozy Card Table</h1>
+              <p>Family card games for slow evenings &amp; weekend mornings</p>
+            </div>
           </div>
         </div>
 

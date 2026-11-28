@@ -148,10 +148,25 @@ button {
   margin-bottom: 20px;
 }
 
+.hub-header-left {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.hub-back-btn {
+  padding: 8px 12px;
+  font-size: 0.86rem;
+  flex-shrink: 0;
+}
+
 .hub-brand {
   display: flex;
   align-items: center;
   gap: 14px;
+  min-width: 0;
 }
 
 .hub-logo {
